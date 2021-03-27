@@ -4,8 +4,8 @@ public class UndoOperationRecord extends OperationRecord {
 
     public final OperationRecord operationUndone;
 
-    public UndoOperationRecord(long id, OperationType operationType, OperationRecord operationUndone) {
-        super(id, operationType);
+    public UndoOperationRecord(long id, OperationRecord operationUndone) {
+        super(id);
         this.operationUndone = operationUndone;
     }
 

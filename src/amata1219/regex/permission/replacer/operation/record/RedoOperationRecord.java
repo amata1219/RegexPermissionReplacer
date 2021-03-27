@@ -4,8 +4,8 @@ public class RedoOperationRecord extends OperationRecord {
 
     public final OperationRecord operationRedone;
 
-    public RedoOperationRecord(long id, OperationType operationType, OperationRecord operationUndone) {
-        super(id, operationType);
+    public RedoOperationRecord(long id, OperationRecord operationUndone) {
+        super(id);
         this.operationRedone = operationUndone;
     }
 

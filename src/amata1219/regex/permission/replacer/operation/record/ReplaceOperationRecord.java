@@ -7,8 +7,8 @@ public class ReplaceOperationRecord extends OperationRecord {
     public final String regex, replacement;
     public final Target target;
 
-    public ReplaceOperationRecord(long id, OperationType operationType, String regex, String replacement, Target target) {
-        super(id, operationType);
+    public ReplaceOperationRecord(long id, String regex, String replacement, Target target) {
+        super(id);
         this.regex = regex;
         this.replacement = replacement;
         this.target = target;
