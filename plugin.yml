@@ -2,7 +2,7 @@ name: RegexPermissionReplacer
 main: amata1219.regex.permission.replacer.RegexPermissionReplacer
 version: 1.0.0
 api-version: 1.16
-depend: [LuckPerms]
+depend: [LuckPerms, PCGF_PluginLib]
 author: '@amata1219'
 
 commands:
