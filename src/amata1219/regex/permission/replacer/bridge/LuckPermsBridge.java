@@ -15,7 +15,7 @@ import java.util.regex.Pattern;
 
 public class LuckPermsBridge {
 
-    private final LuckPerms luckPerms;
+    public final LuckPerms luckPerms;
 
     public LuckPermsBridge(LuckPerms luckPerm) {
         this.luckPerms = luckPerm;
