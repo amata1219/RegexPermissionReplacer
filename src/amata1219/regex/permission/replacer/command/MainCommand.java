@@ -8,8 +8,12 @@ import amata1219.regex.permission.replacer.bryionake.dsl.context.BranchContext;
 import amata1219.regex.permission.replacer.bryionake.dsl.context.CommandContext;
 import amata1219.regex.permission.replacer.bryionake.dsl.context.ExecutionContext;
 import amata1219.regex.permission.replacer.operation.record.OperationRecord;
+import amata1219.regex.permission.replacer.operation.record.ReplaceOperationRecord;
+import amata1219.regex.permission.replacer.operation.target.Target;
 import at.pcgamingfreaks.UUIDConverter;
 import com.google.common.base.Joiner;
+import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Sets;
 import net.luckperms.api.model.group.Group;
 import net.luckperms.api.model.user.User;
 import org.bukkit.Bukkit;
@@ -28,18 +32,21 @@ public class MainCommand implements BukkitCommandExecutor {
 
     public MainCommand(Map<Long, OperationRecord> operationRecords) {
         this.operationRecords = operationRecords;
-    }
 
-    {
         LuckPermsBridge luckPermsBridge = RegexPermissionReplacer.instance().luckPermsBridge();
 
         CommandContext<CommandSender> all = (sender, unparsedArguments, parsedArguments) -> {
             String regex = parsedArguments.poll();
             String replacement = parsedArguments.poll();
+
             List<User> users = Arrays.stream(Bukkit.getOfflinePlayers())
                     .map(OfflinePlayer::getUniqueId)
                     .map(luckPermsBridge::toUser)
                     .collect(Collectors.toList());
+
+            OperationRecord record = new ReplaceOperationRecord(issueNewOperationId(), regex, replacement, Target.ALL);
+            operationRecords.put(record.id, record);
+
             luckPermsBridge.replaceUsersPermissions(users, regex, replacement);
         };
 
@@ -51,7 +58,12 @@ public class MainCommand implements BukkitCommandExecutor {
                 (sender, unparsedArguments, parsedArguments) -> {
                     String regex = parsedArguments.poll();
                     String replacement = parsedArguments.poll();
+
                     Group target = parsedArguments.poll();
+
+                    OperationRecord record = new ReplaceOperationRecord(issueNewOperationId(), regex, replacement, new Target.Group(target.getName()));
+                    operationRecords.put(record.id, record);
+
                     luckPermsBridge.replaceGroupPermissions(target, regex, replacement);
                 },
                 ParserTemplates.group
@@ -60,11 +72,18 @@ public class MainCommand implements BukkitCommandExecutor {
         CommandContext<CommandSender> players = (sender, unparsedArguments, parsedArguments) -> {
             String regex = parsedArguments.poll();
             String replacement = parsedArguments.poll();
+
+            ImmutableSet.Builder<UUID> builder = ImmutableSet.builder();
             List<User> users = new ArrayList<>();
             while (!unparsedArguments.isEmpty()) {
                 UUID playerUniqueId = UUIDConverter.getUUIDFromNameAsUUID(unparsedArguments.poll(), Bukkit.getOnlineMode());
+                builder.add(playerUniqueId);
                 users.add(luckPermsBridge.toUser(playerUniqueId));
             }
+
+            OperationRecord record = new ReplaceOperationRecord(issueNewOperationId(), regex, replacement, new Target.Players(builder.build()));
+            operationRecords.put(record.id, record);
+
             luckPermsBridge.replaceUsersPermissions(users, regex, replacement);
         };
 
@@ -88,12 +107,15 @@ public class MainCommand implements BukkitCommandExecutor {
                 Parsers.str,
                 Parsers.str
         );
-
     }
 
     @Override
     public CommandContext<CommandSender> executor() {
         return executor;
+    }
+
+    private static long issueNewOperationId() {
+        return System.currentTimeMillis();
     }
 
     private static String join(String... parts) {
