@@ -6,6 +6,8 @@ import java.util.UUID;
 
 public interface Target {
 
+    Target ALL = new All();
+
     class All implements Target {
 
     }
