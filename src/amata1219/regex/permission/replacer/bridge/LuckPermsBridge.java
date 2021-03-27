@@ -37,8 +37,9 @@ public class LuckPermsBridge {
         List<Node> matched = new ArrayList<>();
         List<String> replaced = new ArrayList<>();
 
+        Pattern pattern = Pattern.compile(regex);
         for (Node node : holder.data().toCollection()) {
-            Matcher matcher = Pattern.compile(regex).matcher(node.getKey());
+            Matcher matcher = pattern.matcher(node.getKey());
             if (!matcher.matches()) continue;
 
             matched.add(node);
