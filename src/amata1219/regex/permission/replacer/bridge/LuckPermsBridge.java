@@ -1,4 +1,4 @@
-package amata1219.regex.permission.replacer;
+package amata1219.regex.permission.replacer.bridge;
 
 import net.luckperms.api.LuckPerms;
 import net.luckperms.api.model.PermissionHolder;
