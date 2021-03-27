@@ -1,6 +1,5 @@
 package amata1219.regex.permission.replacer.operation.record;
 
-import amata1219.regex.permission.replacer.OperationType;
 import amata1219.regex.permission.replacer.operation.target.Target;
 
 public class ReplaceOperationRecord extends OperationRecord {
