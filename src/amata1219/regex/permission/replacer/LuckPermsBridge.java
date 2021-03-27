@@ -25,11 +25,11 @@ public class LuckPermsBridge {
         return luckPerms.getUserManager().getUser(playerUniqueId);
     }
 
-    public void replacePlayerPermission(List<User> users, String regex, String replacement) {
+    public void replaceUsersPermissions(List<User> users, String regex, String replacement) {
         users.forEach(user -> replacePermissions(user, luckPerms.getUserManager()::saveUser, regex, replacement));
     }
 
-    public void replaceGroupPermission(Group group, String regex, String replacement) {
+    public void replaceGroupPermissions(Group group, String regex, String replacement) {
         replacePermissions(group, luckPerms.getGroupManager()::saveGroup, regex, replacement);
     }
 
