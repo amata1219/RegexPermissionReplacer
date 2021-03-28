@@ -7,13 +7,13 @@ import amata1219.regex.permission.replacer.bryionake.dsl.BukkitCommandExecutor;
 import amata1219.regex.permission.replacer.bryionake.dsl.context.BranchContext;
 import amata1219.regex.permission.replacer.bryionake.dsl.context.CommandContext;
 import amata1219.regex.permission.replacer.bryionake.dsl.context.ExecutionContext;
+import amata1219.regex.permission.replacer.operation.OperationId;
 import amata1219.regex.permission.replacer.operation.record.OperationRecord;
 import amata1219.regex.permission.replacer.operation.record.ReplaceOperationRecord;
 import amata1219.regex.permission.replacer.operation.target.Target;
 import at.pcgamingfreaks.UUIDConverter;
 import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableSet;
-import com.google.common.collect.Sets;
 import net.luckperms.api.model.group.Group;
 import net.luckperms.api.model.user.User;
 import org.bukkit.Bukkit;
@@ -28,9 +28,9 @@ public class MainCommand implements BukkitCommandExecutor {
 
     private final CommandContext<CommandSender> executor = null;
 
-    private final Map<Long, OperationRecord> operationRecords;
+    private final TreeMap<OperationId, OperationRecord> operationRecords;
 
-    public MainCommand(Map<Long, OperationRecord> operationRecords) {
+    public MainCommand(TreeMap<OperationId, OperationRecord> operationRecords) {
         this.operationRecords = operationRecords;
 
         LuckPermsBridge luckPermsBridge = RegexPermissionReplacer.instance().luckPermsBridge();
@@ -107,6 +107,11 @@ public class MainCommand implements BukkitCommandExecutor {
                 Parsers.str,
                 Parsers.str
         );
+
+        CommandContext<CommandSender> undo = (sender, unparsedArguments, parsedArguments) -> {
+            long targetOperationId;
+
+        };
     }
 
     @Override
@@ -114,12 +119,16 @@ public class MainCommand implements BukkitCommandExecutor {
         return executor;
     }
 
-    private static long issueNewOperationId() {
-        return System.currentTimeMillis();
+    private static OperationId issueNewOperationId() {
+        return new OperationId(System.currentTimeMillis());
     }
 
     private static String join(String... parts) {
         return Joiner.on("\n").join(parts);
+    }
+
+    private boolean operationIdExists(long operationId) {
+        return operationRecords.containsKey(operationId);
     }
 
 }
