@@ -7,15 +7,14 @@ import net.luckperms.api.LuckPerms;
 import org.bukkit.event.HandlerList;
 import org.bukkit.plugin.java.JavaPlugin;
 
-import java.util.HashMap;
-import java.util.Map;
+import java.util.TreeMap;
 
 public class RegexPermissionReplacer extends JavaPlugin {
 
     private static RegexPermissionReplacer instance;
     private LuckPermsBridge luckPermsBridge;
 
-    private final Map<Long, OperationRecord> operationRecords = new HashMap<>();
+    private final TreeMap<Long, OperationRecord> operationRecords = new TreeMap<>()
 
     @Override
     public void onEnable() {
