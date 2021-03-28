@@ -1,11 +1,32 @@
-package amata1219.regex.permission.replacer;
+package amata1219.regex.permission.replacer.regex;
+
+import amata1219.regex.permission.replacer.Pair;
 
 import java.util.ArrayList;
 import java.util.List;
 
-public class RegexAndReplacementSwapper {
+public class RegexOperations {
+
+    public static boolean checkSyntax(String regex, String replacement) {
+        List<String> patterns = extractPatterns(regex);
+        for (int i = 0; i < patterns.size(); i++) {
+            if (!replacement.contains("$" + (i + 1))) return false;
+        }
+        return true;
+    }
 
     public static Pair<String, String> swap(String regex, String replacement) {
+        List<String> patterns = extractPatterns(regex);
+        for (int i = 0; i < patterns.size(); i++) {
+            String pattern = patterns.get(i);
+            String placeholder = "$" + (i + 1);
+            regex = regex.replace(pattern, placeholder);
+            replacement = replacement.replace(placeholder, pattern);
+        }
+        return new Pair<>(regex, replacement);
+    }
+
+    private static List<String> extractPatterns(String regex) {
         List<String> patterns = new ArrayList<>();
 
         int bracketsCount = 0, start = 0;
@@ -35,14 +56,7 @@ public class RegexAndReplacementSwapper {
             }
         }
 
-        for (int i = 0; i < patterns.size(); i++) {
-            String pattern = patterns.get(i);
-            String placeholder = "$" + (i + 1);
-            regex = regex.replace(pattern, placeholder);
-            replacement = replacement.replace(placeholder, pattern);
-        }
-
-        return new Pair<>(regex, replacement);
+        return patterns;
     }
 
 }
