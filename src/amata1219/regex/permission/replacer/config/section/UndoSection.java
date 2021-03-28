@@ -17,4 +17,8 @@ public class UndoSection extends ConfigSection {
         undoLimitAtOneTime = section.getInt("Number of operations that can be undone at one time");
     }
 
+    public int undoLimitAtOneTime() {
+        return undoLimitAtOneTime;
+    }
+
 }
