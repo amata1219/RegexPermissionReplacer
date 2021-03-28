@@ -17,4 +17,6 @@ public abstract class ConfigSection {
         return config.config().getConfigurationSection(sectionName);
     }
 
+    public abstract void loadValues();
+
 }
