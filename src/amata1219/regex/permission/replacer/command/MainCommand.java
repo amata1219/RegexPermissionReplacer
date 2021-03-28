@@ -1,5 +1,6 @@
 package amata1219.regex.permission.replacer.command;
 
+import amata1219.regex.permission.replacer.Pair;
 import amata1219.regex.permission.replacer.RegexPermissionReplacer;
 import amata1219.regex.permission.replacer.bridge.LuckPermsBridge;
 import amata1219.regex.permission.replacer.bryionake.adt.Either;
@@ -11,7 +12,9 @@ import amata1219.regex.permission.replacer.bryionake.dsl.context.ExecutionContex
 import amata1219.regex.permission.replacer.OperationId;
 import amata1219.regex.permission.replacer.config.MainConfig;
 import amata1219.regex.permission.replacer.operation.record.OperationRecord;
+import amata1219.regex.permission.replacer.operation.record.OperationRecords;
 import amata1219.regex.permission.replacer.operation.record.ReplaceOperationRecord;
+import amata1219.regex.permission.replacer.operation.record.UndoOperationRecord;
 import amata1219.regex.permission.replacer.operation.target.Target;
 import amata1219.regex.permission.replacer.regex.RegexOperations;
 import at.pcgamingfreaks.UUIDConverter;
@@ -25,26 +28,25 @@ import org.bukkit.OfflinePlayer;
 import org.bukkit.command.CommandSender;
 
 import java.util.*;
+import java.util.function.BiConsumer;
 import java.util.stream.Collectors;
 
 public class MainCommand implements BukkitCommandExecutor {
 
+    private final LuckPermsBridge luckPermsBridge = RegexPermissionReplacer.instance().luckPermsBridge();
+
     private final CommandContext<CommandSender> executor = null;
 
-    private final MainConfig config;
-    private final TreeMap<OperationId, OperationRecord> operationRecords;
+    private final OperationRecords operationRecords;
 
-    public MainCommand(MainConfig config, TreeMap<OperationId, OperationRecord> records) {
-        this.config = config;
-        operationRecords = records;
-
-        LuckPermsBridge luckPermsBridge = RegexPermissionReplacer.instance().luckPermsBridge();
+    public MainCommand(MainConfig config, OperationRecords operationRecords) {
+        this.operationRecords = operationRecords;
 
         CommandContext<CommandSender> all = (sender, unparsedArguments, parsedArguments) -> {
             String regex = parsedArguments.poll();
             String replacement = parsedArguments.poll();
             if (RegexOperations.checkSyntax(regex, replacement)) {
-                sender.sendMessage(ChatColor.RED + "正規表現と置き換える権限の文法に誤りが含まれていたため実行できませんでした。");
+                sender.sendMessage(ChatColor.RED + "正規表現と置き換える権限の文法に誤りがあるため実行できませんでした。");
                 return;
             }
 
@@ -54,7 +56,7 @@ public class MainCommand implements BukkitCommandExecutor {
                     .collect(Collectors.toList());
 
             OperationRecord record = new ReplaceOperationRecord(OperationId.issueNewOperationId(), regex, replacement, Target.ALL);
-            operationRecords.put(record.id, record);
+            operationRecords.put(record);
 
             luckPermsBridge.replaceUsersPermissions(users, regex, replacement);
         };
@@ -68,14 +70,14 @@ public class MainCommand implements BukkitCommandExecutor {
                     String regex = parsedArguments.poll();
                     String replacement = parsedArguments.poll();
                     if (RegexOperations.checkSyntax(regex, replacement)) {
-                        sender.sendMessage(ChatColor.RED + "正規表現と置き換える権限の文法に誤りが含まれていたため実行できませんでした。");
+                        sender.sendMessage(ChatColor.RED + "正規表現と置き換える権限の文法に誤りがあるため実行できませんでした。");
                         return;
                     }
 
                     Group target = parsedArguments.poll();
 
                     OperationRecord record = new ReplaceOperationRecord(OperationId.issueNewOperationId(), regex, replacement, new Target.Group(target.getName()));
-                    operationRecords.put(record.id, record);
+                    operationRecords.put(record);
 
                     luckPermsBridge.replaceGroupPermissions(target, regex, replacement);
                 },
@@ -86,7 +88,7 @@ public class MainCommand implements BukkitCommandExecutor {
             String regex = parsedArguments.poll();
             String replacement = parsedArguments.poll();
             if (RegexOperations.checkSyntax(regex, replacement)) {
-                sender.sendMessage(ChatColor.RED + "正規表現と置き換える権限の文法に誤りが含まれていたため実行できませんでした。");
+                sender.sendMessage(ChatColor.RED + "正規表現と置き換える権限の文法に誤りがあるため実行できませんでした。");
                 return;
             }
 
@@ -99,7 +101,7 @@ public class MainCommand implements BukkitCommandExecutor {
             }
 
             OperationRecord record = new ReplaceOperationRecord(OperationId.issueNewOperationId(), regex, replacement, new Target.Players(builder.build()));
-            operationRecords.put(record.id, record);
+            operationRecords.put(record);
 
             luckPermsBridge.replaceUsersPermissions(users, regex, replacement);
         };
@@ -128,11 +130,11 @@ public class MainCommand implements BukkitCommandExecutor {
         CommandContext<CommandSender> undo = (sender, unparsedArguments, parsedArguments) -> {
             OperationId targetOperationId;
             if (unparsedArguments.isEmpty()) {
-                if (operationRecords.isEmpty()) {
-                    sender.sendMessage(ChatColor.RED + "また一度も置換操作が行われていないため、undo処理を実行できませんでした。");
+                if (operationRecords.operationRecords.isEmpty()) {
+                    sender.sendMessage(ChatColor.RED + "まだ一度も置換操作が行われていないため、undo処理を実行できませんでした。");
                     return;
                 }
-                targetOperationId = operationRecords.lastKey();
+                targetOperationId = operationRecords.lastReplaceOperationRecord().id;
             } else {
                 Either<String, OperationId> result = ParserTemplates.operationId.tryParse(unparsedArguments.poll());
                 if (result instanceof Either.Failure) {
@@ -143,17 +145,27 @@ public class MainCommand implements BukkitCommandExecutor {
                 targetOperationId = ((Either.Success<String, OperationId>) result).value;
             }
 
-            SortedMap<OperationId, OperationRecord> targetOperationRecords = operationRecords.tailMap(targetOperationId);
             int undoLimitAtOneTime = config.undoSection.undoLimitAtOneTime();
-            if (targetOperationRecords.size() > undoLimitAtOneTime) {
-                message(
-                        sender,
-                        ChatColor.RED + "undo処理の対象となる操作の数(" + targetOperationRecords.size() + ")が多すぎて実行できませんでした。",
-                        ChatColor.RED + "一度にundoする操作の数Nは、0 < N ≦ " + undoLimitAtOneTime + " の間になるよう指定して下さい。"
-                );
-                return;
+            int count = 0;
+            List<ReplaceOperationRecord> targetOperationRecords = new ArrayList<>();
+            for (OperationRecord record : operationRecords.operationRecords.values()) {
+                if (!(record instanceof ReplaceOperationRecord)) continue;
+
+                targetOperationRecords.add((ReplaceOperationRecord) record);
+
+                if (record.id == targetOperationId) break;
+
+                if (count++ >= undoLimitAtOneTime) {
+                    message(
+                            sender,
+                            ChatColor.RED + "undo処理の対象となる操作の数(" + targetOperationRecords.size() + ")が多すぎて実行できませんでした。",
+                            ChatColor.RED + "一度にundoする操作の数Nは、0 < N ≦ " + undoLimitAtOneTime + " の間になるよう指定して下さい。"
+                    );
+                    return;
+                }
             }
 
+            targetOperationRecords.forEach(this::undo);
         };
     }
 
@@ -168,6 +180,35 @@ public class MainCommand implements BukkitCommandExecutor {
 
     private static void message(CommandSender sender, String... lines) {
         sender.sendMessage(lines);
+    }
+
+    private void undo(ReplaceOperationRecord targetOperationRecord) {
+        BiConsumer<String, String> replaceMethod;
+        Target target = targetOperationRecord.target;
+        if (target instanceof Target.All) {
+            List<User> users = Arrays.stream(Bukkit.getOfflinePlayers())
+                    .map(OfflinePlayer::getUniqueId)
+                    .map(luckPermsBridge::toUser)
+                    .collect(Collectors.toList());
+            replaceMethod = (regex, replacement) -> luckPermsBridge.replaceUsersPermissions(users, regex, replacement);
+        } else if (target instanceof Target.Group) {
+            Group targetGroup = luckPermsBridge.luckPerms.getGroupManager().getGroup(((Target.Group) target).groupName);
+            replaceMethod = (regex, replacement) -> luckPermsBridge.replaceGroupPermissions(targetGroup, regex, replacement);
+        } else if (target instanceof Target.Players) {
+            List<User> users = ((Target.Players) target).playersUniqueIds
+                    .stream()
+                    .map(luckPermsBridge::toUser)
+                    .collect(Collectors.toList());
+            replaceMethod = (regex, replacement) -> luckPermsBridge.replaceUsersPermissions(users, regex, replacement);
+        } else {
+            throw new IllegalStateException("Target class is not shielded.");
+        }
+
+        UndoOperationRecord record = new UndoOperationRecord(OperationId.issueNewOperationId(), targetOperationRecord);
+        operationRecords.put(record);
+
+        Pair<String, String> swapped = RegexOperations.swap(targetOperationRecord.regex, targetOperationRecord.replacement);
+        replaceMethod.accept(swapped.right, swapped.left);
     }
 
 }
