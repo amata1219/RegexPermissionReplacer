@@ -32,7 +32,9 @@ public abstract class Config {
     public void reload() {
         config = YamlConfiguration.loadConfiguration(file);
         InputStream input = plugin.getResource(fileName);
-        if (input != null) config.setDefaults(YamlConfiguration.loadConfiguration(new InputStreamReader(input, StandardCharsets.UTF_8)));
+        if (input == null) return;
+        config.setDefaults(YamlConfiguration.loadConfiguration(new InputStreamReader(input, StandardCharsets.UTF_8)));
+        loadSections();
     }
 
     public void save() {
@@ -50,6 +52,6 @@ public abstract class Config {
         return config;
     }
 
-    public abstract void loadValues();
+    public abstract void loadSections();
 
 }
