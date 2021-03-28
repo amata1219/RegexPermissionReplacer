@@ -2,7 +2,6 @@ package amata1219.regex.permission.replacer;
 
 import amata1219.regex.permission.replacer.bridge.LuckPermsBridge;
 import amata1219.regex.permission.replacer.command.MainCommand;
-import amata1219.regex.permission.replacer.operation.OperationId;
 import amata1219.regex.permission.replacer.operation.record.OperationRecord;
 import net.luckperms.api.LuckPerms;
 import org.bukkit.event.HandlerList;
