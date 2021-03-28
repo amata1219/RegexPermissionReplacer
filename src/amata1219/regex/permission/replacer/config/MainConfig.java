@@ -9,6 +9,7 @@ public class MainConfig extends Config {
     public MainConfig() {
         super("config.yml");
         undoSection = new UndoSection(this);
+        loadSections();
     }
 
     @Override
