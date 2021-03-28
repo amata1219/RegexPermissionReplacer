@@ -2,16 +2,18 @@ package amata1219.regex.permission.replacer.command;
 
 import amata1219.regex.permission.replacer.RegexPermissionReplacer;
 import amata1219.regex.permission.replacer.bridge.LuckPermsBridge;
+import amata1219.regex.permission.replacer.bryionake.adt.Either;
 import amata1219.regex.permission.replacer.bryionake.constant.Parsers;
 import amata1219.regex.permission.replacer.bryionake.dsl.BukkitCommandExecutor;
 import amata1219.regex.permission.replacer.bryionake.dsl.context.BranchContext;
 import amata1219.regex.permission.replacer.bryionake.dsl.context.CommandContext;
 import amata1219.regex.permission.replacer.bryionake.dsl.context.ExecutionContext;
 import amata1219.regex.permission.replacer.OperationId;
-import amata1219.regex.permission.replacer.bryionake.dsl.parser.FailableParser;
+import amata1219.regex.permission.replacer.config.MainConfig;
 import amata1219.regex.permission.replacer.operation.record.OperationRecord;
 import amata1219.regex.permission.replacer.operation.record.ReplaceOperationRecord;
 import amata1219.regex.permission.replacer.operation.target.Target;
+import amata1219.regex.permission.replacer.regex.RegexOperations;
 import at.pcgamingfreaks.UUIDConverter;
 import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableSet;
@@ -29,16 +31,22 @@ public class MainCommand implements BukkitCommandExecutor {
 
     private final CommandContext<CommandSender> executor = null;
 
+    private final MainConfig config;
     private final TreeMap<OperationId, OperationRecord> operationRecords;
 
-    public MainCommand(TreeMap<OperationId, OperationRecord> operationRecords) {
-        this.operationRecords = operationRecords;
+    public MainCommand(MainConfig config, TreeMap<OperationId, OperationRecord> records) {
+        this.config = config;
+        operationRecords = records;
 
         LuckPermsBridge luckPermsBridge = RegexPermissionReplacer.instance().luckPermsBridge();
 
         CommandContext<CommandSender> all = (sender, unparsedArguments, parsedArguments) -> {
             String regex = parsedArguments.poll();
             String replacement = parsedArguments.poll();
+            if (RegexOperations.checkSyntax(regex, replacement)) {
+                sender.sendMessage(ChatColor.RED + "正規表現と置き換える権限の文法に誤りが含まれていたため実行できませんでした。");
+                return;
+            }
 
             List<User> users = Arrays.stream(Bukkit.getOfflinePlayers())
                     .map(OfflinePlayer::getUniqueId)
@@ -59,6 +67,10 @@ public class MainCommand implements BukkitCommandExecutor {
                 (sender, unparsedArguments, parsedArguments) -> {
                     String regex = parsedArguments.poll();
                     String replacement = parsedArguments.poll();
+                    if (RegexOperations.checkSyntax(regex, replacement)) {
+                        sender.sendMessage(ChatColor.RED + "正規表現と置き換える権限の文法に誤りが含まれていたため実行できませんでした。");
+                        return;
+                    }
 
                     Group target = parsedArguments.poll();
 
@@ -73,6 +85,10 @@ public class MainCommand implements BukkitCommandExecutor {
         CommandContext<CommandSender> players = (sender, unparsedArguments, parsedArguments) -> {
             String regex = parsedArguments.poll();
             String replacement = parsedArguments.poll();
+            if (RegexOperations.checkSyntax(regex, replacement)) {
+                sender.sendMessage(ChatColor.RED + "正規表現と置き換える権限の文法に誤りが含まれていたため実行できませんでした。");
+                return;
+            }
 
             ImmutableSet.Builder<UUID> builder = ImmutableSet.builder();
             List<User> users = new ArrayList<>();
@@ -116,11 +132,28 @@ public class MainCommand implements BukkitCommandExecutor {
                     sender.sendMessage(ChatColor.RED + "また一度も置換操作が行われていないため、undo処理を実行できませんでした。");
                     return;
                 }
-
                 targetOperationId = operationRecords.lastKey();
             } else {
-
+                Either<String, OperationId> result = ParserTemplates.operationId.tryParse(unparsedArguments.poll());
+                if (result instanceof Either.Failure) {
+                    String error = ((Either.Failure<String, OperationId>) result).error;
+                    sender.sendMessage(error);
+                    return;
+                }
+                targetOperationId = ((Either.Success<String, OperationId>) result).value;
             }
+
+            SortedMap<OperationId, OperationRecord> targetOperationRecords = operationRecords.tailMap(targetOperationId);
+            int undoLimitAtOneTime = config.undoSection.undoLimitAtOneTime();
+            if (targetOperationRecords.size() > undoLimitAtOneTime) {
+                message(
+                        sender,
+                        ChatColor.RED + "undo処理の対象となる操作の数(" + targetOperationRecords.size() + ")が多すぎて実行できませんでした。",
+                        ChatColor.RED + "一度にundoする操作の数Nは、0 < N ≦ " + undoLimitAtOneTime + " の間になるよう指定して下さい。"
+                );
+                return;
+            }
+
         };
     }
 
@@ -131,6 +164,10 @@ public class MainCommand implements BukkitCommandExecutor {
 
     private static String join(String... parts) {
         return Joiner.on("\n").join(parts);
+    }
+
+    private static void message(CommandSender sender, String... lines) {
+        sender.sendMessage(lines);
     }
 
 }
