@@ -13,7 +13,7 @@ public class MainConfig extends Config {
     }
 
     @Override
-    public void loadSections() {
+    protected void loadSections() {
         undoSection.loadValues();
     }
 

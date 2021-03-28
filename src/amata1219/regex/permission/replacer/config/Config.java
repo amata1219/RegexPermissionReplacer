@@ -52,6 +52,6 @@ public abstract class Config {
         return config;
     }
 
-    public abstract void loadSections();
+    protected abstract void loadSections();
 
 }
