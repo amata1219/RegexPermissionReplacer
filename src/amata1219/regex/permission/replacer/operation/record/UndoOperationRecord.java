@@ -1,6 +1,6 @@
 package amata1219.regex.permission.replacer.operation.record;
 
-import amata1219.regex.permission.replacer.operation.OperationId;
+import amata1219.regex.permission.replacer.OperationId;
 
 public class UndoOperationRecord extends OperationRecord {
 
