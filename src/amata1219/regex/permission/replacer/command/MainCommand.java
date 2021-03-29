@@ -32,7 +32,7 @@ public class MainCommand implements BukkitCommandExecutor {
 
     private final LuckPermsBridge luckPermsBridge = RegexPermissionReplacer.instance().luckPermsBridge();
 
-    private final CommandContext<CommandSender> executor = null;
+    private final CommandContext<CommandSender> executor;
 
     private final OperationRecords operationRecords;
 
@@ -105,7 +105,7 @@ public class MainCommand implements BukkitCommandExecutor {
 
         BranchContext<CommandSender> targetsBranches = define(
                 () -> join(
-                        ChatColor.RED + "コマンドが正しくありませんでした。",
+                        ChatColor.RED + "正しいコマンドが入力されなかったため実行できませんでした。",
                         ChatColor.GRAY + "/rpr replace [正規表現] [置き換える権限] -all",
                         ChatColor.GRAY + "/rpr replace [正規表現] [置き換える権限] -group [グループ名]",
                         ChatColor.GRAY + "/rpr replace [正規表現] [置き換える権限] -players [プレイヤー名1] [プレイヤー名2] …… [プレイヤー名N]"
@@ -228,6 +228,20 @@ public class MainCommand implements BukkitCommandExecutor {
 
             targetOperationRecords.forEach(this::redo);
         };
+
+        this.executor = define(
+                () -> join(
+                        ChatColor.RED + "正しいコマンドが入力されなかったため実行できませんでした。",
+                        ChatColor.GRAY + "/rpr replace [正規表現] [置き換える権限] -all",
+                        ChatColor.GRAY + "/rpr replace [正規表現] [置き換える権限] -group [グループ名]",
+                        ChatColor.GRAY + "/rpr replace [正規表現] [置き換える権限] -players [プレイヤー名1] [プレイヤー名2] …… [プレイヤー名N]",
+                        ChatColor.GRAY + "/rpr undo ([操作ID])",
+                        ChatColor.GRAY + "/rpr redo ([操作ID])"
+                ),
+                bind("replace", replace),
+                bind("undo", undo),
+                bind("redo", redo)
+        );
     }
 
     @Override
