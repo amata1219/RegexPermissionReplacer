@@ -125,13 +125,20 @@ public class MainCommand implements BukkitCommandExecutor {
         );
 
         CommandContext<CommandSender> undo = (sender, unparsedArguments, parsedArguments) -> {
-            OperationId targetOperationId;
+            List<ReplaceOperationRecord> targetOperationRecords = new ArrayList<>();
             if (unparsedArguments.isEmpty()) {
                 if (operationRecords.operationRecords.isEmpty()) {
                     sender.sendMessage(ChatColor.RED + "まだ一度も置換操作が行われていないため、undo処理を実行できませんでした。");
                     return;
                 }
-                targetOperationId = operationRecords.lastReplaceOperationRecord().id;
+
+                OperationRecord targetOperationRecord = operationRecords.operationRecords.firstEntry().getValue();
+                if (targetOperationRecord instanceof UndoOperationRecord) {
+                    sender.sendMessage(ChatColor.RED + "undo操作をundoすることはできません。");
+                    return;
+                }
+
+                targetOperationRecords.add((ReplaceOperationRecord) targetOperationRecord);
             } else {
                 Either<String, OperationId> result = ParserTemplates.operationId.tryParse(unparsedArguments.poll());
                 if (result instanceof Either.Failure) {
@@ -139,39 +146,87 @@ public class MainCommand implements BukkitCommandExecutor {
                     sender.sendMessage(error);
                     return;
                 }
-                targetOperationId = ((Either.Success<String, OperationId>) result).value;
-            }
 
-            int undoLimitAtOneTime = config.undoSection.undoLimitAtOneTime();
-            int count = 0;
-            List<ReplaceOperationRecord> targetOperationRecords = new ArrayList<>();
-            for (OperationRecord record : operationRecords.operationRecords.values()) {
-                if (record instanceof UndoOperationRecord) continue;
+                OperationId targetOperationId = ((Either.Success<String, OperationId>) result).value;
+                int count = 0;
+                int undoLimitAtOneTime = config.undoSection.undoLimitAtOneTime();
+                for (OperationRecord record : operationRecords.operationRecords.values()) {
+                    if (record instanceof UndoOperationRecord) continue;
 
-                targetOperationRecords.add(extractRootRecord(record));
+                    targetOperationRecords.add(extractRootRecord(record));
 
-                if (record.id == targetOperationId) break;
+                    if (record.id == targetOperationId) break;
 
-                if (count++ >= undoLimitAtOneTime) {
-                    message(
-                            sender,
-                            ChatColor.RED + "undo処理の対象となる置換操作の数(" + targetOperationRecords.size() + ")が多すぎて実行できませんでした。",
-                            ChatColor.RED + "一度にundoする置換操作の数Nは、0 < N ≦ " + undoLimitAtOneTime + " の間になるよう指定して下さい。"
-                    );
+                    if (count++ >= undoLimitAtOneTime) {
+                        message(
+                                sender,
+                                ChatColor.RED + "undo処理の対象となる置換操作の数(" + targetOperationRecords.size() + ")が多すぎて実行できませんでした。",
+                                ChatColor.RED + "一度にundoする置換操作の数Nは、0 < N ≦ " + undoLimitAtOneTime + " の間になるよう指定して下さい。"
+                        );
+                        return;
+                    }
+                }
+
+                if (targetOperationRecords.isEmpty()) {
+                    sender.sendMessage(ChatColor.RED + "まだ一度も置換操作が行われていないためundo処理を実行することができませんでした。");
                     return;
                 }
-            }
-
-            if (targetOperationRecords.isEmpty()) {
-                sender.sendMessage(ChatColor.RED + "まだ一度も置換操作が行われていないためundo処理を実行することができませんでした。");
-                return;
             }
 
             targetOperationRecords.forEach(this::undo);
         };
 
         CommandContext<CommandSender> redo = (sender, unparsedArguments, parsedArguments) -> {
+            List<ReplaceOperationRecord> targetOperationRecords = new ArrayList<>();
+            if (unparsedArguments.isEmpty()) {
+                if (operationRecords.operationRecords.isEmpty()) {
+                    sender.sendMessage(ChatColor.RED + "まだ一度もundo操作が行われていないため、redo処理を実行できませんでした。");
+                    return;
+                }
 
+                OperationRecord targetOperationRecord = operationRecords.operationRecords.firstEntry().getValue();
+                if (!(targetOperationRecord instanceof UndoOperationRecord)) {
+                    sender.sendMessage(ChatColor.RED + "undo以外の操作をredoすることはできません。");
+                    return;
+                }
+
+                targetOperationRecords.add(extractRootRecord(targetOperationRecord));
+            } else {
+                Either<String, OperationId> result = ParserTemplates.operationId.tryParse(unparsedArguments.poll());
+                if (result instanceof Either.Failure) {
+                    String error = ((Either.Failure<String, OperationId>) result).error;
+                    sender.sendMessage(error);
+                    return;
+                }
+
+                OperationId targetOperationId = ((Either.Success<String, OperationId>) result).value;
+                int count = 0;
+                int undoLimitAtOneTime = config.undoSection.undoLimitAtOneTime();
+                for (OperationRecord record : operationRecords.operationRecords.values()) {
+                    if (record instanceof ReplaceOperationRecord) break;
+                    else if (record instanceof RedoOperationRecord) continue;
+
+                    targetOperationRecords.add(extractRootRecord(record));
+
+                    if (record.id == targetOperationId) break;
+
+                    if (count++ >= undoLimitAtOneTime) {
+                        message(
+                                sender,
+                                ChatColor.RED + "undo処理の対象となる置換操作の数(" + targetOperationRecords.size() + ")が多すぎて実行できませんでした。",
+                                ChatColor.RED + "一度にundoする置換操作の数Nは、0 < N ≦ " + undoLimitAtOneTime + " の間になるよう指定して下さい。"
+                        );
+                        return;
+                    }
+                }
+
+                if (targetOperationRecords.isEmpty()) {
+                    sender.sendMessage(ChatColor.RED + "まだ一度も置換操作が行われていないためundo処理を実行することができませんでした。");
+                    return;
+                }
+            }
+
+            targetOperationRecords.forEach(this::redo);
         };
     }
 
@@ -194,33 +249,41 @@ public class MainCommand implements BukkitCommandExecutor {
         else return (ReplaceOperationRecord) record;
     }
 
-    private void undo(ReplaceOperationRecord targetOperationRecord) {
-        BiConsumer<String, String> replaceMethod;
+    private BiConsumer<String, String> correspondingReplaceMethod(ReplaceOperationRecord targetOperationRecord) {
         Target target = targetOperationRecord.target;
         if (target instanceof Target.All) {
             List<User> users = Arrays.stream(Bukkit.getOfflinePlayers())
                     .map(OfflinePlayer::getUniqueId)
                     .map(luckPermsBridge::toUser)
                     .collect(Collectors.toList());
-            replaceMethod = (regex, replacement) -> luckPermsBridge.replaceUsersPermissions(users, regex, replacement);
+            return (regex, replacement) -> luckPermsBridge.replaceUsersPermissions(users, regex, replacement);
         } else if (target instanceof Target.Group) {
             Group targetGroup = luckPermsBridge.luckPerms.getGroupManager().getGroup(((Target.Group) target).groupName);
-            replaceMethod = (regex, replacement) -> luckPermsBridge.replaceGroupPermissions(targetGroup, regex, replacement);
+            return (regex, replacement) -> luckPermsBridge.replaceGroupPermissions(targetGroup, regex, replacement);
         } else if (target instanceof Target.Players) {
             List<User> users = ((Target.Players) target).playersUniqueIds
                     .stream()
                     .map(luckPermsBridge::toUser)
                     .collect(Collectors.toList());
-            replaceMethod = (regex, replacement) -> luckPermsBridge.replaceUsersPermissions(users, regex, replacement);
+            return (regex, replacement) -> luckPermsBridge.replaceUsersPermissions(users, regex, replacement);
         } else {
             throw new IllegalStateException("Target class is not shielded.");
         }
+    }
 
+    private void undo(ReplaceOperationRecord targetOperationRecord) {
         UndoOperationRecord record = new UndoOperationRecord(OperationId.issueNewOperationId(), targetOperationRecord);
         operationRecords.put(record);
 
         Pair<String, String> swapped = RegexOperations.swap(targetOperationRecord.regex, targetOperationRecord.replacement);
-        replaceMethod.accept(swapped.right, swapped.left);
+        correspondingReplaceMethod(targetOperationRecord).accept(swapped.right, swapped.left);
+    }
+
+    private void redo(ReplaceOperationRecord targetOperationRecord) {
+        UndoOperationRecord record = new UndoOperationRecord(OperationId.issueNewOperationId(), targetOperationRecord);
+        operationRecords.put(record);
+
+        correspondingReplaceMethod(targetOperationRecord).accept(targetOperationRecord.regex, targetOperationRecord.replacement);
     }
 
 }
