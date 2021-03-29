@@ -11,10 +11,7 @@ import amata1219.regex.permission.replacer.bryionake.dsl.context.CommandContext;
 import amata1219.regex.permission.replacer.bryionake.dsl.context.ExecutionContext;
 import amata1219.regex.permission.replacer.OperationId;
 import amata1219.regex.permission.replacer.config.MainConfig;
-import amata1219.regex.permission.replacer.operation.record.OperationRecord;
-import amata1219.regex.permission.replacer.operation.record.OperationRecords;
-import amata1219.regex.permission.replacer.operation.record.ReplaceOperationRecord;
-import amata1219.regex.permission.replacer.operation.record.UndoOperationRecord;
+import amata1219.regex.permission.replacer.operation.record.*;
 import amata1219.regex.permission.replacer.operation.target.Target;
 import amata1219.regex.permission.replacer.regex.RegexOperations;
 import at.pcgamingfreaks.UUIDConverter;
@@ -149,23 +146,32 @@ public class MainCommand implements BukkitCommandExecutor {
             int count = 0;
             List<ReplaceOperationRecord> targetOperationRecords = new ArrayList<>();
             for (OperationRecord record : operationRecords.operationRecords.values()) {
-                if (!(record instanceof ReplaceOperationRecord)) continue;
+                if (record instanceof UndoOperationRecord) continue;
 
-                targetOperationRecords.add((ReplaceOperationRecord) record);
+                targetOperationRecords.add(extractRootRecord(record));
 
                 if (record.id == targetOperationId) break;
 
                 if (count++ >= undoLimitAtOneTime) {
                     message(
                             sender,
-                            ChatColor.RED + "undo処理の対象となる操作の数(" + targetOperationRecords.size() + ")が多すぎて実行できませんでした。",
-                            ChatColor.RED + "一度にundoする操作の数Nは、0 < N ≦ " + undoLimitAtOneTime + " の間になるよう指定して下さい。"
+                            ChatColor.RED + "undo処理の対象となる置換操作の数(" + targetOperationRecords.size() + ")が多すぎて実行できませんでした。",
+                            ChatColor.RED + "一度にundoする置換操作の数Nは、0 < N ≦ " + undoLimitAtOneTime + " の間になるよう指定して下さい。"
                     );
                     return;
                 }
             }
 
+            if (targetOperationRecords.isEmpty()) {
+                sender.sendMessage(ChatColor.RED + "まだ一度も置換操作が行われていないためundo処理を実行することができませんでした。");
+                return;
+            }
+
             targetOperationRecords.forEach(this::undo);
+        };
+
+        CommandContext<CommandSender> redo = (sender, unparsedArguments, parsedArguments) -> {
+
         };
     }
 
@@ -180,6 +186,12 @@ public class MainCommand implements BukkitCommandExecutor {
 
     private static void message(CommandSender sender, String... lines) {
         sender.sendMessage(lines);
+    }
+
+    private static ReplaceOperationRecord extractRootRecord(OperationRecord record) {
+        if (record instanceof UndoOperationRecord) return extractRootRecord(((UndoOperationRecord) record).operationUndone);
+        else if (record instanceof RedoOperationRecord) return extractRootRecord(((RedoOperationRecord) record).operationRedone);
+        else return (ReplaceOperationRecord) record;
     }
 
     private void undo(ReplaceOperationRecord targetOperationRecord) {

@@ -44,6 +44,8 @@ public class LuckPermsBridge {
 
             matched.add(node);
             replaced.add(matcher.replaceFirst(replacement));
+
+            System.out.println("matched: " + node + " replaced: " + matcher.replaceFirst(replacement));
         }
 
         matched.forEach(holder.data()::remove);
