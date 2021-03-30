@@ -304,7 +304,7 @@ public class MainCommand implements BukkitCommandExecutor {
     }
 
     private void redo(ReplaceOperationRecord targetOperationRecord) {
-        UndoOperationRecord record = new UndoOperationRecord(OperationId.issueNewOperationId(), targetOperationRecord);
+        RedoOperationRecord record = new RedoOperationRecord(OperationId.issueNewOperationId(), targetOperationRecord);
         operationRecords.put(record);
 
         correspondingReplaceMethod(targetOperationRecord).accept(targetOperationRecord.regex, targetOperationRecord.replacement);
