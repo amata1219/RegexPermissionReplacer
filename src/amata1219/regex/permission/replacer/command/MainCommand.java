@@ -141,7 +141,7 @@ public class MainCommand implements BukkitCommandExecutor {
                     return;
                 }
 
-                targetOperationRecords.add((ReplaceOperationRecord) targetOperationRecord);
+                targetOperationRecords.add(extractRootRecord(targetOperationRecord));
             } else {
                 Either<String, OperationId> result = ParserTemplates.operationId.tryParse(unparsedArguments.poll());
                 if (result instanceof Either.Failure) {
