@@ -9,6 +9,7 @@ public class RegexOperations {
 
     public static boolean checkSyntax(String regex, String replacement) {
         List<String> patterns = extractPatterns(regex);
+        System.out.println("DEBUG: " + patterns.size() + " regex: " + regex + ", rp: " + replacement);
         for (int i = 0; i < patterns.size(); i++) {
             if (!replacement.contains("$" + (i + 1))) return false;
         }
