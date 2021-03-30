@@ -14,7 +14,6 @@ import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 
 import java.util.ArrayDeque;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.function.Supplier;
@@ -28,7 +27,7 @@ public interface BukkitCommandExecutor extends CommandExecutor {
     }
 
     default <S extends CommandSender> ExecutionContext<S> define(Supplier<String> argumentNotFoundErrorMessage, CommandContext<S> context, FailableParser<?>... parsers) {
-        return new ExecutionContext<>(() -> prefixErrorMessage(argumentNotFoundErrorMessage), (ArrayList<FailableParser<?>>) Arrays.asList(parsers), context);
+        return new ExecutionContext<>(() -> prefixErrorMessage(argumentNotFoundErrorMessage), Arrays.asList(parsers), context);
     }
 
     default <S extends CommandSender> BranchContext<S> define(Supplier<String> argumentNotFoundErrorMessage, Pair<String, CommandContext<S>>... branches) {
