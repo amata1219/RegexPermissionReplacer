@@ -1,6 +1,7 @@
-package amata1219.regex.permission.replacer.bridge;
+package amata1219.regex.permission.replacer.luck.perms;
 
 import net.luckperms.api.LuckPerms;
+import net.luckperms.api.LuckPermsProvider;
 import net.luckperms.api.model.PermissionHolder;
 import net.luckperms.api.model.group.Group;
 import net.luckperms.api.model.user.User;
@@ -8,29 +9,20 @@ import net.luckperms.api.node.Node;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.UUID;
 import java.util.function.Consumer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-public class LuckPermsBridge {
+public class PermissionReplacer {
 
-    public final LuckPerms luckPerms;
+    private static final LuckPerms LUCK_PERMS = LuckPermsProvider.get();
 
-    public LuckPermsBridge(LuckPerms luckPerm) {
-        this.luckPerms = luckPerm;
+    public static void replaceUsersPermissions(List<User> users, String regex, String replacement) {
+        users.forEach(user -> replacePermissions(user, LUCK_PERMS.getUserManager()::saveUser, regex, replacement));
     }
 
-    public User toUser(UUID playerUniqueId) {
-        return luckPerms.getUserManager().getUser(playerUniqueId);
-    }
-
-    public void replaceUsersPermissions(List<User> users, String regex, String replacement) {
-        users.forEach(user -> replacePermissions(user, luckPerms.getUserManager()::saveUser, regex, replacement));
-    }
-
-    public void replaceGroupPermissions(Group group, String regex, String replacement) {
-        replacePermissions(group, luckPerms.getGroupManager()::saveGroup, regex, replacement);
+    public static void replaceGroupPermissions(Group group, String regex, String replacement) {
+        replacePermissions(group, LUCK_PERMS.getGroupManager()::saveGroup, regex, replacement);
     }
 
     private static <T extends PermissionHolder> void replacePermissions(T holder, Consumer<T> save, String regex, String replacement) {

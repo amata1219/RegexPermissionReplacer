@@ -1,8 +1,7 @@
 package amata1219.regex.permission.replacer.command;
 
 import amata1219.regex.permission.replacer.Pair;
-import amata1219.regex.permission.replacer.RegexPermissionReplacer;
-import amata1219.regex.permission.replacer.bridge.LuckPermsBridge;
+import amata1219.regex.permission.replacer.luck.perms.LuckPermsBridge;
 import amata1219.regex.permission.replacer.bryionake.adt.Either;
 import amata1219.regex.permission.replacer.bryionake.constant.Parsers;
 import amata1219.regex.permission.replacer.bryionake.dsl.BukkitCommandExecutor;
@@ -11,12 +10,14 @@ import amata1219.regex.permission.replacer.bryionake.dsl.context.CommandContext;
 import amata1219.regex.permission.replacer.bryionake.dsl.context.ExecutionContext;
 import amata1219.regex.permission.replacer.OperationId;
 import amata1219.regex.permission.replacer.config.MainConfig;
+import amata1219.regex.permission.replacer.luck.perms.PermissionReplacer;
 import amata1219.regex.permission.replacer.operation.record.*;
 import amata1219.regex.permission.replacer.operation.target.Target;
 import amata1219.regex.permission.replacer.regex.RegexOperations;
 import at.pcgamingfreaks.UUIDConverter;
 import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableSet;
+import net.luckperms.api.LuckPermsProvider;
 import net.luckperms.api.model.group.Group;
 import net.luckperms.api.model.user.User;
 import org.bukkit.Bukkit;
@@ -30,11 +31,13 @@ import java.util.stream.Collectors;
 
 public class MainCommand implements BukkitCommandExecutor {
 
-    private final LuckPermsBridge luckPermsBridge = RegexPermissionReplacer.instance().luckPermsBridge();
-
     private final CommandContext<CommandSender> executor;
 
     private final OperationRecords operationRecords;
+
+    /*
+        非同期化
+     */
 
     public MainCommand(MainConfig config, OperationRecords operationRecords) {
         this.operationRecords = operationRecords;
@@ -49,13 +52,13 @@ public class MainCommand implements BukkitCommandExecutor {
 
             List<User> users = Arrays.stream(Bukkit.getOfflinePlayers())
                     .map(OfflinePlayer::getUniqueId)
-                    .map(luckPermsBridge::toUser)
+                    .map(LuckPermsBridge::toUser)
                     .collect(Collectors.toList());
 
             OperationRecord record = new ReplaceOperationRecord(OperationId.issueNewOperationId(), regex, replacement, Target.ALL);
             operationRecords.put(record);
 
-            luckPermsBridge.replaceUsersPermissions(users, regex, replacement);
+            PermissionReplacer.replaceUsersPermissions(users, regex, replacement);
         };
 
         ExecutionContext<CommandSender> group = define(
@@ -76,7 +79,7 @@ public class MainCommand implements BukkitCommandExecutor {
                     OperationRecord record = new ReplaceOperationRecord(OperationId.issueNewOperationId(), regex, replacement, new Target.Group(target.getName()));
                     operationRecords.put(record);
 
-                    luckPermsBridge.replaceGroupPermissions(target, regex, replacement);
+                    PermissionReplacer.replaceGroupPermissions(target, regex, replacement);
                 },
                 ParserTemplates.group
         );
@@ -94,13 +97,13 @@ public class MainCommand implements BukkitCommandExecutor {
             while (!unparsedArguments.isEmpty()) {
                 UUID playerUniqueId = UUIDConverter.getUUIDFromNameAsUUID(unparsedArguments.poll(), Bukkit.getOnlineMode());
                 builder.add(playerUniqueId);
-                users.add(luckPermsBridge.toUser(playerUniqueId));
+                users.add(LuckPermsBridge.toUser(playerUniqueId));
             }
 
             OperationRecord record = new ReplaceOperationRecord(OperationId.issueNewOperationId(), regex, replacement, new Target.Players(builder.build()));
             operationRecords.put(record);
 
-            luckPermsBridge.replaceUsersPermissions(users, regex, replacement);
+            PermissionReplacer.replaceUsersPermissions(users, regex, replacement);
         };
 
         BranchContext<CommandSender> targetsBranches = define(
@@ -268,18 +271,18 @@ public class MainCommand implements BukkitCommandExecutor {
         if (target instanceof Target.All) {
             List<User> users = Arrays.stream(Bukkit.getOfflinePlayers())
                     .map(OfflinePlayer::getUniqueId)
-                    .map(luckPermsBridge::toUser)
+                    .map(LuckPermsBridge::toUser)
                     .collect(Collectors.toList());
-            return (regex, replacement) -> luckPermsBridge.replaceUsersPermissions(users, regex, replacement);
+            return (regex, replacement) -> PermissionReplacer.replaceUsersPermissions(users, regex, replacement);
         } else if (target instanceof Target.Group) {
-            Group targetGroup = luckPermsBridge.luckPerms.getGroupManager().getGroup(((Target.Group) target).groupName);
-            return (regex, replacement) -> luckPermsBridge.replaceGroupPermissions(targetGroup, regex, replacement);
+            Group targetGroup = LuckPermsProvider.get().getGroupManager().getGroup(((Target.Group) target).groupName);
+            return (regex, replacement) -> PermissionReplacer.replaceGroupPermissions(targetGroup, regex, replacement);
         } else if (target instanceof Target.Players) {
             List<User> users = ((Target.Players) target).playersUniqueIds
                     .stream()
-                    .map(luckPermsBridge::toUser)
+                    .map(LuckPermsBridge::toUser)
                     .collect(Collectors.toList());
-            return (regex, replacement) -> luckPermsBridge.replaceUsersPermissions(users, regex, replacement);
+            return (regex, replacement) -> PermissionReplacer.replaceUsersPermissions(users, regex, replacement);
         } else {
             throw new IllegalStateException("Target class is not shielded.");
         }
