@@ -92,10 +92,15 @@ public class MainCommand implements BukkitCommandExecutor {
                 return;
             }
 
+            if (unparsedArguments.isEmpty()) {
+                sender.sendMessage(ChatColor.RED + "権限の置き換えの対象とするプレイヤーを指定して下さい。");
+                return;
+            }
+
             List<User> users = new ArrayList<>();
             ImmutableSet.Builder<UUID> builder = ImmutableSet.builder();
             while (!unparsedArguments.isEmpty()) {
-                UUID playerUniqueId = UUIDConverter.getUUIDFromNameAsUUID(parsedArguments.poll(), Bukkit.getOnlineMode());
+                UUID playerUniqueId = UUIDConverter.getUUIDFromNameAsUUID(unparsedArguments.poll(), Bukkit.getOnlineMode());
                 users.add(toUser(playerUniqueId));
                 builder.add(playerUniqueId);
             }
