@@ -1,14 +1,13 @@
 package amata1219.regex.permission.replacer.command;
 
+import amata1219.regex.permission.replacer.OperationId;
 import amata1219.regex.permission.replacer.Pair;
-import amata1219.regex.permission.replacer.luck.perms.LuckPermsBridge;
 import amata1219.regex.permission.replacer.bryionake.adt.Either;
 import amata1219.regex.permission.replacer.bryionake.constant.Parsers;
 import amata1219.regex.permission.replacer.bryionake.dsl.BukkitCommandExecutor;
 import amata1219.regex.permission.replacer.bryionake.dsl.context.BranchContext;
 import amata1219.regex.permission.replacer.bryionake.dsl.context.CommandContext;
 import amata1219.regex.permission.replacer.bryionake.dsl.context.ExecutionContext;
-import amata1219.regex.permission.replacer.OperationId;
 import amata1219.regex.permission.replacer.config.MainConfig;
 import amata1219.regex.permission.replacer.luck.perms.PermissionReplacer;
 import amata1219.regex.permission.replacer.operation.record.*;
@@ -19,6 +18,7 @@ import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableSet;
 import net.luckperms.api.LuckPerms;
 import net.luckperms.api.LuckPermsProvider;
+import net.luckperms.api.model.data.NodeMap;
 import net.luckperms.api.model.group.Group;
 import net.luckperms.api.model.user.User;
 import net.luckperms.api.model.user.UserManager;
@@ -26,11 +26,17 @@ import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.OfflinePlayer;
 import org.bukkit.command.CommandSender;
+import org.bukkit.entity.Player;
 
-import java.util.*;
+import java.lang.reflect.InvocationTargetException;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.UUID;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiConsumer;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 public class MainCommand implements BukkitCommandExecutor {
 
@@ -42,7 +48,13 @@ public class MainCommand implements BukkitCommandExecutor {
 
     /*
         非同期化
+        .* $0 の無効化
+        records.yml
+        config.yml redo-section limitation
      */
+
+    private User temp = null;
+    private NodeMap nodemap = null;
 
     public MainCommand(MainConfig config, OperationRecords operationRecords) {
         this.operationRecords = operationRecords;
@@ -58,7 +70,7 @@ public class MainCommand implements BukkitCommandExecutor {
             OperationRecord record = new ReplaceOperationRecord(OperationId.issueNewOperationId(), regex, replacement, Target.ALL);
             operationRecords.put(record);
 
-            PermissionReplacer.replaceUsersPermissions(allUsers(), regex, replacement);
+            PermissionReplacer.replaceUsersPermissions(allUsers(), Pattern.compile(regex), replacement);
         };
 
         ExecutionContext<CommandSender> group = define(
@@ -79,7 +91,7 @@ public class MainCommand implements BukkitCommandExecutor {
                     OperationRecord record = new ReplaceOperationRecord(OperationId.issueNewOperationId(), regex, replacement, new Target.Group(target.getName()));
                     operationRecords.put(record);
 
-                    PermissionReplacer.replaceGroupPermissions(target, regex, replacement);
+                    PermissionReplacer.replaceGroupPermissions(target, Pattern.compile(regex), replacement);
                 },
                 ParserTemplates.group
         );
@@ -97,18 +109,90 @@ public class MainCommand implements BukkitCommandExecutor {
                 return;
             }
 
+            UUID debug = null;
+
             List<User> users = new ArrayList<>();
+            List<UUID> uuids = new ArrayList<>();
             ImmutableSet.Builder<UUID> builder = ImmutableSet.builder();
             while (!unparsedArguments.isEmpty()) {
-                UUID playerUniqueId = UUIDConverter.getUUIDFromNameAsUUID(unparsedArguments.poll(), Bukkit.getOnlineMode());
+                UUID playerUniqueId = debug = UUIDConverter.getUUIDFromNameAsUUID(unparsedArguments.poll(), Bukkit.getOnlineMode());
                 users.add(toUser(playerUniqueId));
                 builder.add(playerUniqueId);
+
+                uuids.add(playerUniqueId);
             }
 
             OperationRecord record = new ReplaceOperationRecord(OperationId.issueNewOperationId(), regex, replacement, new Target.Players(builder.build()));
             operationRecords.put(record);
 
-            PermissionReplacer.replaceUsersPermissions(users, regex, replacement);
+            UUID finalDebug = debug;
+            for (UUID uuid : uuids) {
+                AtomicReference<User> u1 = new AtomicReference<>();
+                AtomicReference<User> u2 = new AtomicReference<>();
+                LUCK_PERMS.getUserManager().modifyUser(uuid, user -> {
+                    u1.set(user);
+                    PermissionReplacer.NODES.forEach(user.data()::add);
+                }).join();
+                System.out.println("exp saved");
+                System.out.println();
+
+                /*
+                    RecordedNodeMapのchangesが空の場合saveUserが走らない可能性
+                 */
+
+                LUCK_PERMS.getUserManager().modifyUser(uuid, user -> {
+                    u2.set(user);
+                    PermissionReplacer.experiment(user);
+                }).join();
+                System.out.println("rpr saved");
+                System.out.println();
+
+                Bukkit.getServer().dispatchCommand(Bukkit.getConsoleSender(), "rpr out amata1219");
+                System.out.println("outed");
+                System.out.println();
+
+                Bukkit.getServer().dispatchCommand(Bukkit.getConsoleSender(), "rpr debug amata1219 rpr.24");
+                System.out.println("checked");
+                System.out.println();
+
+                for (int k = 0; k < 100; k++) {
+                    boolean hasExp = Bukkit.getPlayer(finalDebug).hasPermission("exp." + k);
+                    boolean hasRpr = Bukkit.getPlayer(finalDebug).hasPermission("rpr." + k);
+                    System.out.print("(" + k + ": " + hasExp + ", " + hasRpr + "), ");
+                }
+                System.out.println();
+                System.out.println("looped");
+                System.out.println();
+
+                User loaded = LUCK_PERMS.getUserManager().getUser(uuid);
+                System.out.println(u1.get() == u2.get());
+                System.out.println(u1.get() == loaded);
+                System.out.println(u2.get() == loaded);
+                System.out.println("compared");
+
+                new ArrayList<>(loaded.data().toCollection()).stream().forEach(node -> {
+                    System.out.print(node.getKey() + ": " + node.getValue() + " ");
+                });
+                System.out.println();
+                System.out.println("loaded: outed");
+
+                temp = loaded;
+                nodemap = loaded.data();
+            }
+            /*Bukkit.getScheduler().runTaskAsynchronously(RegexPermissionReplacer.instance(), task -> {
+                User user = users.get(0);
+                PermissionReplacer.NODES.forEach(user.data()::add);
+                LUCK_PERMS.getUserManager().saveUser(user).whenComplete(($, ex) -> {
+                    System.out.println("exp saved");
+                    //for (int i = 0; i < 1; i++)
+                    PermissionReplacer.experiment(user).whenComplete(($$, exx) -> {
+                        for (int k = 0; k < 100; k++) {
+                            System.out.println(k + ": " + Bukkit.getPlayer(finalDebug).hasPermission("exp." + k) + ", " + Bukkit.getPlayer(finalDebug).hasPermission("rpr." + k));
+                        }
+                    });
+                });
+            });*/
+            //PermissionReplacer.replaceUsersPermissions(users, Pattern.compile(regex), replacement);
         };
 
         BranchContext<CommandSender> targetsBranches = define(
@@ -237,6 +321,34 @@ public class MainCommand implements BukkitCommandExecutor {
             targetOperationRecords.forEach(this::redo);
         };
 
+        CommandContext<CommandSender> debug = define(
+                () -> "/rpr debug <player-name> <permission>",
+                (sender, unparsedArguments, parsedArguments) -> {
+                    Player player = parsedArguments.poll();
+                    String permission = parsedArguments.poll();
+                    player.sendMessage(String.valueOf(player.hasPermission(permission)));
+                },
+                Parsers.player,
+                Parsers.str
+        );
+
+        CommandContext<CommandSender> out = define(
+                () -> "/rpr debug <player-name> <permission>",
+                (sender, unparsedArguments, parsedArguments) -> {
+                    Player player = parsedArguments.poll();
+                    User user = LUCK_PERMS.getUserManager().getUser(player.getUniqueId());
+                    NodeMap data = user.data();
+                    new ArrayList<>(data.toCollection()).stream().forEach(node -> {
+                        System.out.print(node.getKey() + ": " + node.getValue() + " ");
+                    });
+                    System.out.println("cmd-outed");
+                    System.out.println(temp == user);
+                    System.out.println(nodemap == data);
+                    System.out.println("cmd-compared");
+                },
+                Parsers.player
+        );
+
         this.executor = define(
                 () -> join(
                         ChatColor.RED + "正しいコマンドが入力されなかったため実行できませんでした。",
@@ -248,7 +360,9 @@ public class MainCommand implements BukkitCommandExecutor {
                 ),
                 bind("replace", replace),
                 bind("undo", undo),
-                bind("redo", redo)
+                bind("redo", redo),
+                bind("debug", debug),
+                bind("out", out)
         );
     }
 
@@ -283,7 +397,7 @@ public class MainCommand implements BukkitCommandExecutor {
         else return (ReplaceOperationRecord) record;
     }
 
-    private BiConsumer<String, String> correspondingReplaceMethod(ReplaceOperationRecord targetOperationRecord) {
+    private BiConsumer<Pattern, String> correspondingReplaceMethod(ReplaceOperationRecord targetOperationRecord) {
         Target target = targetOperationRecord.target;
         if (target instanceof Target.All) {
             return (regex, replacement) -> PermissionReplacer.replaceUsersPermissions(allUsers(), regex, replacement);
@@ -305,14 +419,14 @@ public class MainCommand implements BukkitCommandExecutor {
         operationRecords.put(record);
 
         Pair<String, String> swapped = RegexOperations.swap(targetOperationRecord.regex, targetOperationRecord.replacement);
-        correspondingReplaceMethod(targetOperationRecord).accept(swapped.right, swapped.left);
+        correspondingReplaceMethod(targetOperationRecord).accept(Pattern.compile(swapped.right), swapped.left);
     }
 
     private void redo(ReplaceOperationRecord targetOperationRecord) {
         RedoOperationRecord record = new RedoOperationRecord(OperationId.issueNewOperationId(), targetOperationRecord);
         operationRecords.put(record);
 
-        correspondingReplaceMethod(targetOperationRecord).accept(targetOperationRecord.regex, targetOperationRecord.replacement);
+        correspondingReplaceMethod(targetOperationRecord).accept(Pattern.compile(targetOperationRecord.regex), targetOperationRecord.replacement);
     }
 
 }
